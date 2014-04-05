@@ -68,6 +68,7 @@ io.sockets.on('connection', function (socket) {
 	game.active = sockets.length != 0;
 	socket.on('message', function () { 
 		socket.counter = 0;
+		socket.send("hi");
 	});
 	socket.on('disconnect', function () {		
 		var index = sockets.indexOf(socket);

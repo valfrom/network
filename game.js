@@ -2,6 +2,7 @@ var TICK_TIME = 1000/60;
 
 var Game=function() {
 	this.actors = {};
+	this.active = false;
 }
 
 Game.prototype.update = function(dt) {
@@ -14,6 +15,9 @@ Game.prototype.update = function(dt) {
 Game.prototype.render = function(ctx) {
 	gctx.fillStyle = "rgb(100, 120, 100)";
 	gctx.fillRect(0, 0, 640, 440);
+	gctx.font = "20px Arial";
+	gctx.fillStyle = "rgb(0, 0, 0)";
+	gctx.fillText(network.pingTime+"ms", 10, 30);
 
 	for(var id in this.actors) {
 		var actor = this.actors[id];
@@ -47,6 +51,9 @@ game.spawnActor(a2);
 
 
 setInterval(function() {
+	if(!game.active) {
+		return;
+	}
 	game.update(TICK_TIME);
 	game.render();
 	network.update();
