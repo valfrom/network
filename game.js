@@ -8,13 +8,14 @@ var Game=function() {
 Game.prototype.update = function(dt) {
 	for(var id in this.actors) {
 		var actor = this.actors[id];
+		actor.myActor = (network.actorId == id);
 		actor.update(dt);
 	}
 }
 
 Game.prototype.render = function(ctx) {
 	gctx.fillStyle = "rgb(100, 120, 100)";
-	gctx.fillRect(0, 0, 640, 440);
+	gctx.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
 	gctx.font = "20px Arial";
 	gctx.fillStyle = "rgb(0, 0, 0)";
 	gctx.fillText(network.pingTime+"ms", 10, 30);
@@ -30,25 +31,41 @@ Game.prototype.spawnActor = function(actor) {
 	this.actors[actor.id] = actor;
 }
 
+Game.prototype.destroyActor = function(id) {
+	delete this.actors[id];
+}
+
+Game.prototype.input = function(pos) {
+	network.sendInput(pos);
+}
+
 Game.prototype.networkUpdate = function(data) {
-	for(var id in data) {
+	var actorData = data.actors;
+	for(var id in actorData) {
 		var actor = this.actors[id];
-		var val = data[id];
+		if(actor === undefined) {
+			actor = new Actor(id);
+			this.spawnActor(actor);
+		}
+		var val = actorData[id];
 		actor.x = val.x;
 		actor.y = val.y;
 		actor.speed = val.speed;
 	}
+
+	var destroyedActors = {};
+	for(var id in this.actors) {
+		if(actorData[id] == null) {
+			destroyedActors[id] = id;
+		}
+	}
+
+	for(var id in destroyedActors) {
+		this.destroyActor(id);
+	}
 }
 
-
 var game = new Game();
-
-var a1 = new Actor("1");
-var a2 = new Actor("2");
-
-game.spawnActor(a1);
-game.spawnActor(a2);
-
 
 setInterval(function() {
 	if(!game.active) {

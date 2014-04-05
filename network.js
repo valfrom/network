@@ -1,15 +1,21 @@
 
-var URL = 'http://localhost:9090';
-// var URL = 'http://ios.keitaitoys.com:9090';
+//var URL = 'http://localhost:9090';
+var URL = 'http://ios.keitaitoys.com:9090';
 var REQUESTS_MAX = 2;
 
 var Network = function(url) {
 	this.url = url;
 	this.counter = 0;
 	this.pingTime = 0;
+	this.actorId = 0;
+	this.sendingPing = false;
 }
 
 Network.prototype.ping = function() {
+	if(this.sendingPing) {
+		return;
+	}
+	this.sendingPing = true;
 	this.startDate = new Date();
 	this.socket.send("hi");
 }
@@ -24,6 +30,12 @@ Network.prototype.start = function(game) {
 		socket.on('message', function () {
 			var now = new Date();
 			network.pingTime = (now.getTime()-network.startDate.getTime());
+			network.sendingPing = false;
+			network.counter = 0;
+		});
+
+		socket.on('actorId', function (id) {
+			network.actorId = id;
 		});
 
 		socket.on('gameInfo', function (msg) {
@@ -41,10 +53,15 @@ Network.prototype.start = function(game) {
 }
 
 Network.prototype.update = function() {
-	if(this.counter < REQUESTS_MAX)  {
+	//if(this.counter < REQUESTS_MAX)  
+	{
 		this.counter ++;
 		this.ping();
 	}
+}
+
+Network.prototype.sendInput = function(pos) {
+	this.socket.emit('input', pos);
 }
 
 var network = new Network(URL);
