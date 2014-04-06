@@ -3,6 +3,7 @@ var REQUESTS_MAX = 3;
 var SCREEN_WIDTH = 640;
 var SCREEN_HEIGHT = 440;
 var MAX_SPEED = 4;
+var REQUEST_MIN_TIME = 1000;
 var actorId = 1;
 
 var Actor = function(id) {
@@ -64,14 +65,10 @@ Game.prototype.gameInfo = function() {
 	return result;
 }
 
-var game = new Game();
-
-var io = require('socket.io').listen(9090);
-var sockets = [];
-
-io.sockets.on('connection', function (socket) {
-	sockets.push(socket);
-	game.active = sockets.length != 0;
+var Client = function(socket) {
+	this.date = new Date();
+	this.counter = 0;
+	this.socket = socket;
 	var a = new Actor(actorId++);
 	a.x = Math.random() * 640;
 	a.y = Math.random() * 300 + 20;
@@ -79,28 +76,61 @@ io.sockets.on('connection', function (socket) {
 	a.speed.y = (MAX_SPEED - Math.random() * MAX_SPEED * 2)*0.1;
 
 	game.spawnActor(a);
+	this.actor = a;
 
 	socket.emit('actorId', a.id);
+}
 
-	socket.on('message', function () { 
-		socket.counter = 0;
-		socket.send("hi");
+Client.prototype.onDisconnect = function() {
+	game.destroyActor(this.actor.id);
+}
+
+Client.prototype.onInput = function(pos) {
+	this.actor.x = pos.x;
+	this.actor.y = pos.y;
+	this.actor.speed.x = (MAX_SPEED - Math.random() * MAX_SPEED * 2)*0.1;
+	this.actor.speed.y = (MAX_SPEED - Math.random() * MAX_SPEED * 2)*0.1;
+}
+
+Client.prototype.onMessage = function(msg) {
+	this.counter = 0;
+	this.socket.send("hi");
+}
+
+Client.prototype.update = function(gameInfo) {
+	var now = new Date();
+	if(this.counter < REQUESTS_MAX || (now.getTime() - this.date.getTime()) > REQUEST_MIN_TIME) {
+		this.counter ++;
+		this.date = now;
+		this.socket.emit('gameInfo', gameInfo);
+	}
+}
+
+var game = new Game();
+
+var io = require('socket.io').listen(9090);
+var clients = [];
+
+io.sockets.on('connection', function (socket) {
+	var client = new Client(socket);
+	clients.push(client);
+	game.active = clients.length != 0;
+
+	socket.on('message', function (msg) { 
+		client.onMessage(msg);
 	});
 
 	socket.on('input', function (pos) { 
-		a.x = pos.x;
-		a.y = pos.y;
-		a.speed.x = (MAX_SPEED - Math.random() * MAX_SPEED * 2)*0.1;
-		a.speed.y = (MAX_SPEED - Math.random() * MAX_SPEED * 2)*0.1;
+		client.onInput(pos);
 	});
 
 	socket.on('disconnect', function () {		
-		var index = sockets.indexOf(socket);
+		var index = clients.indexOf(client);
 		if(index != -1) {
-			sockets.splice(index);
+			clients.splice(index);
 		}
-		game.active = sockets.length != 0;
-		game.destroyActor(a.id);
+		game.active = clients.length != 0;
+		client.onDisconnect();
 	});
 });
 
@@ -112,11 +142,8 @@ setInterval(function() {
 	}
 	game.update(TICK_TIME);
 	var gameInfo = game.gameInfo();
-	for(var i=0;i<sockets.length;i++) {
-		var socket = sockets[i];
-		if(socket.counter < REQUESTS_MAX) {
-			socket.counter ++;
-			socket.emit('gameInfo', gameInfo);
-		}
+	for(var i=0;i<clients.length;i++) {
+		var client = clients[i];
+		client.update(gameInfo);
 	}
 }, TICK_TIME);
